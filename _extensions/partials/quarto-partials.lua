@@ -61,6 +61,13 @@ local function render_partial(file, data, context)
   local template = f:read("a")
   f:close()
 
+  if type(data) == "table" and data.filename ~= nil then
+    local c = io.open(data.filename, "r")
+    local code_str = c:read("a")
+    c:close()
+    data.code = code_str
+  end
+
   local rendered = lustache:render(template, data)
 
   -- if context is text (but in case new contexts are added)
@@ -75,23 +82,19 @@ local function render_partial(file, data, context)
     elseif context == "inline" then
       return quarto.utils.string_to_inlines(rendered)
     end
-
   elseif string.match(file, "%.md") or string.match(file, "%.txt") then
     -- Render `.md` through Pandoc
-rendered = pandoc.read(rendered)
+    rendered = pandoc.read(rendered)
     if context == "inline" then
       return pandoc.utils.stringify(rendered)
     end
     return rendered.blocks
-
-    
-  elseif string.match(file, "%.tex")  then
+  elseif string.match(file, "%.tex") then
     -- Limit `.tex` to LaTeX documents
     if context == "inline" then
       return pandoc.RawBlock('tex', rendered)
     end
     return pandoc.RawBlock('tex', rendered)
-  
   elseif string.match(file, "%.html") then
     -- And `.html` for HTML documents
     if context == "inline" then
@@ -99,7 +102,7 @@ rendered = pandoc.read(rendered)
     end
     return pandoc.RawBlock('html', rendered)
   end
-  
+
   return rendered
 end
 
@@ -113,7 +116,7 @@ local function quarto_partial(args, kwargs, meta, raw_args, context)
     partial_data = copy(meta)
     partial_key = args[2]
     local partial_keys = string.split(partial_key, "%.")
-  
+
     for _, key in ipairs(partial_keys) do
       if partial_data[key] then
         partial_data = copy(partial_data[key])
@@ -143,14 +146,13 @@ local function quarto_partial(args, kwargs, meta, raw_args, context)
     if pandoc.utils.type(v) == "string" then
       v_is_json_string = string.match(v, "^%[") or string.match(v, "^{")
     end
-    
+
     if v_is_json_string then
       data[k] = quarto.json.decode(v)
     else
       data[k] = v
     end
   end
-
 
   return render_partial(args[1], data, context)
 end
